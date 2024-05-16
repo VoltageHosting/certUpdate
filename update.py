@@ -7,9 +7,10 @@ import socket
 # Start an interactive bash shell
 
 
-password = "redacted"
+password = "passwordPlaceholder"
 email = "webmaster@voltagehosting.net"
 ip = "192.168.1.25"
+key = "keyPlaceholder"
 
 domainsList = []
 textCodeList = []
@@ -49,16 +50,17 @@ def addDomain(dom):
     fi.close()
 
 def deleteAll():
-    global domainsList, textCodeList, email, password
+    global domainsList, textCodeList, email, password, key
     for i in range(len(domainsList)):
-        pexpect.run(f'curl -X POST -d "{textCodeList[i]}" --user {email}:{password} https://mail.voltagehosting.net/admin/dns/custom/{domainsList[i]}/txt')
+        pexpect.run(f'curl -X POST https://mail.voltagehosting.net/admin/dns/custom/{domainsList[i]}/txt -H "Content-Type: text/plain" --data-raw "{textCodeList[i]}" -H "Authorization: Basic {key}"')
 
 def sendRecord(do,tv):
-    global email, password
-    pexpect.run(f'curl -X POST -d "{tv}" --user {email}:{password} https://mail.voltagehosting.net/admin/dns/custom/{do}/txt')
+    global email, password, key
+    pexpect.run(f'curl -X POST https://mail.voltagehosting.net/admin/dns/custom/{do}/txt -H "Content-Type: text/plain" --data-raw "{tv}" -H "Authorization: Basic {key}"')
 
 def renewDomains():
     global password, domainsList, textCodeList
+    print("Starting")
     doms = open("domains.txt","r")
     domsList = doms.read().split(",")
     addString = ""
@@ -81,19 +83,26 @@ def renewDomains():
             process.sendline("E")
         else:
             break
+    print("Registering Names")
     while True:
         index = process.expect([pexpect.TIMEOUT, "Press Enter to Continue", pexpect.EOF])
         if index == 1:
-            domain = process.before.decode().splitlines()[4].replace(".voltagehosting.net.",".voltagehosting.net")
-            textCode = process.before.decode().splitlines()[8]
+            if domainTotal == 0:
+                domain = process.before.decode().splitlines()[6].replace(".voltagehosting.net.",".voltagehosting.net")
+                textCode = process.before.decode().splitlines()[10]
+            else:
+                domain = process.before.decode().splitlines()[5].replace(".voltagehosting.net.",".voltagehosting.net")
+                textCode = process.before.decode().splitlines()[9]
             domainsList.append(domain)
             textCodeList.append(textCode)
             sendRecord(domain,textCode)
-            time.sleep(2)
+            domainTotal += 1
+            print("Do "+domain,"Tx "+textCode)
+            time.sleep(5)
             process.sendline("")
         else:
             break
-    print(process.before.decode())
+    # print(process.before.decode())
     hostN = socket.gethostname()
     hostNEW = hostN.split(".")
     deleteAll()
